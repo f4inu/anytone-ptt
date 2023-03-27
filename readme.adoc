@@ -1,0 +1,169 @@
+= How to use an AnyTone Bluetooth PTT BP-02 button with a computer
+:source-highlighter: rouge
+:toc:
+
+== How to use the python script
+
+The script is very simple. It waits for your ptt button to connect to your computer (by pressing on the button) then send `space` when pressed.
+
+=== Setup 
+
+If you don't want to mess up your system, you can use a `venv`, otherwise you can just `pip3 install`: 
+[source,console]
+----
+$ python3 -m venv venv_ble
+$ . venv_ble/bin/activate
+$ pip3 install BLE_GATT
+$ pip3 install pyautogui
+----
+
+=== Usage
+
+Just run `ptt_gatt.py` in a terminal window and keep it open while you operate with your favorite piece of software. It works well with SparkSDR.
+
+[source,console]
+----
+$ ./ptt_gatt.py
+----
+
+Press `^C` to quit.
+
+== What to do if your PTT button does not have the same mac as mine
+
+The script is hardcoded with `00:1B:10:60:B0:2A` as bluetooth mac. If your PTT button has a different mac address, you have to find it and replace it in the script. Here is how to find it using
+`bluetoothctl`:
+
+[source,console]
+----
+$ bluetoothctl
+Agent registered
+[CHG] Controller B4:69:21:14:8E:DE Pairable: yes <1>
+[bluetooth]# scan on <2>
+Discovery started
+[CHG] Controller B4:69:21:14:8E:DE Discovering: yes
+[CHG] Device 00:1B:10:60:B0:2A RSSI: -77 <3>
+[CHG] Device 00:1B:10:60:B0:2A Name: ELET-PTT60B02A <4>
+[CHG] Device 00:1B:10:60:B0:2A Alias: ELET-PTT60B02A
+[CHG] Device 00:1B:10:60:B0:2A ManufacturerData Key: 0x5045
+[CHG] Device 00:1B:10:60:B0:2A ManufacturerData Value: 54 54 c0 53 72 64 
+----
+<1> This is my bluetooth device on my laptop
+<2> Scan for devices around
+<3> Very quickly we found a new device with a received signal strenght indicator of -77dB, with its mac address
+<4> The name of the device found, again with its mac address 
+
+You might find some other devices. The one you're interested in should have a very similar name, if not the same.
+
+Once you have the mac address of your ptt button, edit the python script to reflect your setup and you're in business!
+
+
+
+
+== How I found the magic uuid value
+
+In the script all the magic happens here:
+[source,python]
+----
+button.on_value_change(button_uuid, notify_handler)
+----
+
+But, how did I found the `button_uuid` value?
+
+First, let's query the device:
+
+[source,console]
+----
+[bluetooth]# info 00:1B:10:60:B0:2A
+Device 00:1B:10:60:B0:2A (public)
+Name: ELET-PTT60B02A
+Alias: ELET-PTT60B02A
+Paired: no
+Trusted: no
+Blocked: no
+Connected: no
+LegacyPairing: no
+UUID: Generic Access Profile    (00001800-0000-1000-8000-00805f9b34fb)
+UUID: Unknown                   (0000ff01-0000-1000-8000-00805f9b34fb)
+UUID: Vendor specific           (9e5d1e47-5c13-43a0-8635-82ad38a1386f)
+ManufacturerData Key: 0x5045
+ManufacturerData Value:
+54 54 c0 53 72 64                                TT.Srd
+RSSI: -69
+----
+
+Ok, it exposes a few uuids. Lets gather more information:
+
+[source,console]
+----
+[bluetooth]# connect 00:1B:10:60:B0:2A
+Attempting to connect to 00:1B:10:60:B0:2A
+[CHG] Device 00:1B:10:60:B0:2A Connected: yes
+Connection successful
+[NEW] Primary Service (Handle 0x7461)
+	/org/bluez/hci0/dev_00_1B_10_60_B0_2A/service0004
+	0000ff01-0000-1000-8000-00805f9b34fb
+	Unknown
+[NEW] Characteristic (Handle 0x7461)
+	/org/bluez/hci0/dev_00_1B_10_60_B0_2A/service0004/char0005
+	0000ff02-0000-1000-8000-00805f9b34fb
+	Unknown
+[NEW] Descriptor (Handle 0x1eb4)
+	/org/bluez/hci0/dev_00_1B_10_60_B0_2A/service0004/char0005/desc0007
+	00002902-0000-1000-8000-00805f9b34fb
+	Client Characteristic Configuration
+[NEW] Characteristic (Handle 0x7461)
+	/org/bluez/hci0/dev_00_1B_10_60_B0_2A/service0004/char0008
+	0000ff03-0000-1000-8000-00805f9b34fb
+	Unknown
+[NEW] Primary Service (Handle 0x7461)
+	/org/bluez/hci0/dev_00_1B_10_60_B0_2A/service000a
+	9e5d1e47-5c13-43a0-8635-82ad38a1386f
+	Vendor specific
+[NEW] Characteristic (Handle 0x7461)
+	/org/bluez/hci0/dev_00_1B_10_60_B0_2A/service000a/char000b
+	e3dd50bf-f7a7-4e99-838e-570a086c666b
+	Vendor specific
+[NEW] Descriptor (Handle 0x27f4)
+	/org/bluez/hci0/dev_00_1B_10_60_B0_2A/service000a/char000b/desc000d
+	00002902-0000-1000-8000-00805f9b34fb
+	Client Characteristic Configuration
+[NEW] Characteristic (Handle 0x7461)
+	/org/bluez/hci0/dev_00_1B_10_60_B0_2A/service000a/char000e
+	92e86c7a-d961-4091-b74f-2409e72efe36
+	Vendor specific
+[NEW] Characteristic (Handle 0x7461)
+	/org/bluez/hci0/dev_00_1B_10_60_B0_2A/service000a/char0010
+	347f7608-2e2d-47eb-913b-75d4edc4de3b
+	Vendor specific
+[CHG] Device 00:1B:10:60:B0:2A UUIDs: 00001800-0000-1000-8000-00805f9b34fb
+[CHG] Device 00:1B:10:60:B0:2A UUIDs: 0000ff01-0000-1000-8000-00805f9b34fb
+[CHG] Device 00:1B:10:60:B0:2A UUIDs: 9e5d1e47-5c13-43a0-8635-82ad38a1386f
+[CHG] Device 00:1B:10:60:B0:2A ServicesResolved: yes
+[CHG] Device 00:1B:10:60:B0:2A Alias: 00-1B-10-60-B0-2A
+[CHG] Device 00:1B:10:60:B0:2A Name is nil
+----
+
+Ok wow, that's a lot! Let's go now to the GATT menu (where we can also `list-attributes` to get this list back if needed) to check what uuid is the right one:
+
+[source,console]
+----
+[00-1B-10-60-B0-2A]# menu gatt
+[00-1B-10-60-B0-2A]# select-attribute /org/bluez/hci0/dev_00_1B_10_60_B0_2A/service0004/char0005 <1>
+[00-1B-10-60-B0-2A:/service0004/char0005]# notify on <2>
+[CHG] Attribute /org/bluez/hci0/dev_00_1B_10_60_B0_2A/service0004/char0005 Notifying: yes
+Notify started
+[CHG] Attribute /org/bluez/hci0/dev_00_1B_10_60_B0_2A/service0004/char0005 Value:
+  42 41 54 54 28                                   BATT(           
+<button press> <3>
+[CHG] Attribute /org/bluez/hci0/dev_00_1B_10_60_B0_2A/service0004/char0005 Value:
+  45 4c 45 54 31                                   ELET1           
+<button release> <4>
+[CHG] Attribute /org/bluez/hci0/dev_00_1B_10_60_B0_2A/service0004/char0005 Value:
+  45 4c 45 54 32                                   ELET2           
+[00-1B-10-60-B0-2A:/service0004/char0005]#
+----
+<1> I've tried all the paths exposed, one by one, this is the one I wanted, hence the uuid of `0000ff02-0000-1000-8000-00805f9b34fb`
+<2> `notify on` will show in the console events when something happens, like, for example, a button press :)
+<2> Here button was pressed
+<3> Button was released here
+
